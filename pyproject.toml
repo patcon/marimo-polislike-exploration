@@ -8,3 +8,6 @@ dependencies = [
     "marimo>=0.23.14",
     "valency-anndata>=0.4.0",
 ]
+
+[tool.uv.sources]
+valency-anndata = { path = "../valency-anndata", editable = true }

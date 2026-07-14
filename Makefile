@@ -2,7 +2,7 @@ install: ## Install dependencies
 	uv sync
 
 dev: ## Open the notebook in the marimo editor (interactive, editable)
-	uv run marimo edit notebook.py
+	uv run marimo edit notebook.py --watch --no-token
 
 run-app: ## Serve the notebook as a read-only app
 	uv run marimo run notebook.py

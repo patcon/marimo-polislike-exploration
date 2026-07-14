@@ -19,7 +19,38 @@ def _(val):
 
 @app.cell
 def _(adata, val):
-    val.viz.schematic_diagram(adata)
+    _ = val.viz.schematic_diagram(adata)
+    return
+
+
+@app.cell
+def _(adata):
+    adata.var
+    return
+
+
+@app.cell
+def _(adata, val):
+    _ = val.tools.recipe_polis(adata)
+    return
+
+
+@app.cell
+def _(adata, val):
+    _ = val.viz.schematic_diagram(adata)
+    return
+
+
+@app.cell
+def _(adata, val):
+    strict_mod_in_mask = (adata.var["moderation_state"] > 0).to_numpy()
+    _ = val.viz.heatmap(
+        adata,
+        discrete=True,
+        groupby="kmeans_polis",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
     return
 
 

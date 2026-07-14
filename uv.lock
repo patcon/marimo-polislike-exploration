@@ -1470,14 +1470,10 @@ wheels = [
 
 [[package]]
 name = "langevitour"
-version = "0.8.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.8.1"
+source = { git = "https://github.com/patcon/langevitour?rev=fix-js-indent#20ee112de2b5a472d59bdb645c40fc8a6281e877" }
 dependencies = [
     { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/e4/9cb6e52bc75a5f7c4367c6a8d9458c1cd36b969ae2d29f055d69913b3c51/langevitour-0.8.0.tar.gz", hash = "sha256:c3a8bc150bdbd1e94645b5446244e40a4fd3f08d0c90e46ece606b038024d633", size = 55030, upload-time = "2025-04-13T00:43:06.022Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/26/8eb41db046f9ed1f1334cdaa282c8d4a0d3127c6fd94b6bb4ee5d3324c2a/langevitour-0.8.0-py3-none-any.whl", hash = "sha256:c5bfeb0664c4c4a9844f0fcd1b2254af8ca9810371ccc70c5a2f219031b7f1ed", size = 55405, upload-time = "2025-04-13T00:32:14.546Z" },
 ]
 
 [[package]]
@@ -1638,7 +1634,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "marimo", specifier = ">=0.23.14" },
-    { name = "valency-anndata", specifier = ">=0.4.0" },
+    { name = "valency-anndata", editable = "../valency-anndata" },
 ]
 
 [[package]]
@@ -3379,7 +3375,7 @@ wheels = [
 [[package]]
 name = "valency-anndata"
 version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../valency-anndata" }
 dependencies = [
     { name = "anndata" },
     { name = "googletrans" },
@@ -3398,10 +3394,38 @@ dependencies = [
     { name = "svgwrite" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/89/737af4c767ee3ae986029fe381ae63314ee11b3446a0915cf191eab3500e/valency_anndata-0.4.0.tar.gz", hash = "sha256:874730e4d83fe90404759d2a69dbe9b789fc72d7189562fdbc4de073fa2d94c7", size = 13537007, upload-time = "2026-07-08T16:32:45.246Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/9e/00e4091bc0efdd65eee198f3b62f9369055e2751bf724d0c160a55bdab0d/valency_anndata-0.4.0-py3-none-any.whl", hash = "sha256:67df985979fde6e2113a8f49dd438c3f63abc9d596c87bf9767400ac0d98b9af", size = 69667, upload-time = "2026-07-08T16:32:41.259Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "anndata", specifier = ">=0.11.4,<0.13.0" },
+    { name = "googletrans", specifier = ">=4.0.2" },
+    { name = "huggingface-hub" },
+    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=7.1.0" },
+    { name = "ipywidgets", specifier = "<8" },
+    { name = "itables", marker = "extra == 'dev'", specifier = ">=2.6.2" },
+    { name = "jupyter-scatter", specifier = ">=0.22.2" },
+    { name = "langevitour", git = "https://github.com/patcon/langevitour?rev=fix-js-indent" },
+    { name = "llvmlite", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<=0.45.1" },
+    { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.6.1" },
+    { name = "mkdocs-glightbox", marker = "extra == 'dev'", specifier = ">=0.4.0" },
+    { name = "mkdocs-macros-plugin", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "mkdocs-material", extras = ["imaging"], marker = "extra == 'dev'", specifier = ">=9.7.1" },
+    { name = "mkdocstrings-python", marker = "extra == 'dev'", specifier = ">=2.0.1" },
+    { name = "nbconvert", marker = "extra == 'dev'", specifier = ">=7.16.6" },
+    { name = "nest-asyncio", specifier = ">=1.6.0" },
+    { name = "pacmap", specifier = ">=0.8.0" },
+    { name = "platformdirs", specifier = ">=4.0" },
+    { name = "polis-client", specifier = ">=0.1.2" },
+    { name = "polismath-commentgraph", marker = "extra == 'polis2'", git = "https://github.com/patcon/polis?subdirectory=delphi%2Fumap_narrative%2Fpolismath_commentgraph&rev=package-commentgraph" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "red-dwarf", specifier = "~=0.4.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.10" },
+    { name = "scanpy", extras = ["leiden"] },
+    { name = "setuptools", specifier = "<81" },
+    { name = "svgwrite", specifier = ">=1.4.3" },
+    { name = "tqdm", specifier = ">=4.0" },
 ]
+provides-extras = ["dev", "polis2"]
 
 [[package]]
 name = "wcwidth"
