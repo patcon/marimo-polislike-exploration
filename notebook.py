@@ -14,6 +14,9 @@ def _():
 @app.cell
 def _(val):
     adata = val.datasets.chile_protest(translate_to="en")
+
+    # work-around for valency-anndata/scanpy doing in-memory edits that aren't reative.
+    _ = True
     return (adata,)
 
 
