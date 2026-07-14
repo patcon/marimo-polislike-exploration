@@ -1,5 +1,19 @@
-install: ## Install dependencies
-	uv sync
+VALENCY_ANNDATA_VERSION := >=0.4.0
+VALENCY_ANNDATA_GIT := https://github.com/patcon/valency-anndata
+VALENCY_ANNDATA_LOCAL_PATH := ../valency-anndata
+
+install: ## Install dependencies, using the published valency-anndata package
+	uv remove valency-anndata --frozen >/dev/null 2>&1 || true
+	uv add "valency-anndata$(VALENCY_ANNDATA_VERSION)"
+
+install-local: ## Install valency-anndata as an editable checkout at ../valency-anndata
+	uv remove valency-anndata --frozen >/dev/null 2>&1 || true
+	uv add --editable $(VALENCY_ANNDATA_LOCAL_PATH)
+
+install-remote-patch: ## Install valency-anndata from a git branch (usage: make install-remote-patch BRANCH=my-branch)
+	@test -n "$(BRANCH)" || (echo "Usage: make install-remote-patch BRANCH=<branch>" >&2; exit 1)
+	uv remove valency-anndata --frozen >/dev/null 2>&1 || true
+	uv add "valency-anndata @ git+$(VALENCY_ANNDATA_GIT)" --branch $(BRANCH)
 
 dev: ## Open the notebook in the marimo editor (interactive, editable)
 	uv run marimo edit notebook.py --watch --no-token
@@ -20,7 +34,7 @@ clean: ## Remove marimo session/autosave state
 %:
 	@true
 
-.PHONY: install dev run-app html script clean help
+.PHONY: install install-local install-remote-patch dev run-app html script clean help
 
 help:
 	@echo 'Usage: make <command>'
