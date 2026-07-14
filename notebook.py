@@ -28,15 +28,17 @@ def _(adata, val):
 
 
 @app.cell
-def _(adata, val):
-    _ = val.preprocessing.impute(adata, strategy="knn", source_layer="X_masked", target_layer="X_masked_imputed_knn5")
-    _ = val.viz.schematic_diagram(adata)
+def _(adata):
+    adata.var
     return
 
 
 @app.cell
 def _(adata):
-    adata.var
+    if "is_meta" not in adata.var.columns:
+        adata.var["is_meta"] = False
+    elif adata.var["is_meta"].isna().any():
+        adata.var["is_meta"] = adata.var["is_meta"].fillna(False).astype(bool)
     return
 
 
@@ -48,6 +50,7 @@ def _(adata, val):
 
 @app.cell
 def _(adata, val):
+    _ = val.preprocessing.impute(adata, strategy="knn", source_layer="X_masked", target_layer="X_masked_imputed_knn5")
     _ = val.viz.schematic_diagram(adata)
     return
 
