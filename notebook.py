@@ -52,7 +52,29 @@ def _(adata, val):
 
 
 @app.cell
+def _(adata, val):
+    # PaCMAP-based recipe, modelled after val.tools.recipe_polis:
+    # same masked/imputed layer and participant vote-count mask, but
+    # embedding via PaCMAP instead of PCA + sparsity-aware scaling.
+    val.tools.pacmap(
+        adata,
+        layer="X_masked_imputed_mean",
+        key_added="X_pacmap_polis",
+    )
+    val.tools.kmeans(
+        adata,
+        use_rep="X_pacmap_polis",
+        k_bounds=(2, 5),
+        init="polis",
+        mask_obs="cluster_mask",
+        key_added="kmeans_pacmap",
+    )
+    return
+
+
+@app.cell
 def _(adata):
+    # This conversation used strict moderation, so unless explicitly voted in, it wasn't shown.
     strict_mod_in_mask = (adata.var["moderation_state"] > 0).to_numpy()
     return (strict_mod_in_mask,)
 
