@@ -7,8 +7,11 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import valency_anndata as val
+    import numpy as np
+    import pandas as pd
+    import scanpy as sc
 
-    return (val,)
+    return np, pd, sc, val
 
 
 @app.cell
@@ -98,6 +101,35 @@ def _(adata, val):
 
 
 @app.cell
+def _(adata, np, pd, sc, val):
+    # Leiden clustering on the PaCMAP embedding, restricted to cluster_mask
+    # (mirrors the kmeans_pacmap masking) since leiden itself has no mask_obs arg.
+    _mask = adata.obs["cluster_mask"].to_numpy()
+    _sub = adata[_mask].copy()
+    sc.pp.neighbors(_sub, use_rep="X_pacmap_polis")
+    val.tools.leiden(_sub, key_added="leiden_pacmap")
+
+    _labels = np.full(adata.n_obs, np.nan, dtype=object)
+    _labels[_mask] = _sub.obs["leiden_pacmap"].to_numpy()
+    adata.obs["leiden_pacmap"] = pd.Categorical(_labels)
+    return
+
+
+@app.cell
+def _(adata, np, pd, sc, val):
+    # Leiden clustering on the LocalMAP embedding, restricted to cluster_mask.
+    _mask = adata.obs["cluster_mask"].to_numpy()
+    _sub = adata[_mask].copy()
+    sc.pp.neighbors(_sub, use_rep="X_localmap_polis")
+    val.tools.leiden(_sub, key_added="leiden_localmap")
+
+    _labels = np.full(adata.n_obs, np.nan, dtype=object)
+    _labels[_mask] = _sub.obs["leiden_localmap"].to_numpy()
+    adata.obs["leiden_localmap"] = pd.Categorical(_labels)
+    return
+
+
+@app.cell
 def _(adata, val):
     val.viz.embedding(adata, basis="pca_polis", color="kmeans_polis")
     return
@@ -112,6 +144,18 @@ def _(adata, val):
 @app.cell
 def _(adata, val):
     val.viz.embedding(adata, basis="localmap_polis", color="kmeans_localmap")
+    return
+
+
+@app.cell
+def _(adata, val):
+    val.viz.embedding(adata, basis="pacmap_polis", color="leiden_pacmap")
+    return
+
+
+@app.cell
+def _(adata, val):
+    val.viz.embedding(adata, basis="localmap_polis", color="leiden_localmap")
     return
 
 
@@ -212,6 +256,70 @@ def _(adata, strict_mod_in_mask, val):
         adata,
         layer="X_masked_imputed_knn5",
         groupby="kmeans_localmap",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
+    return
+
+
+@app.cell
+def _(adata, strict_mod_in_mask, val):
+    # Using original data
+    _ = val.viz.heatmap(
+        adata,
+        discrete=True,
+        layer="raw_sparse",
+        groupby="leiden_pacmap",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
+
+    # Using mean imputed data
+    _ = val.viz.heatmap(
+        adata,
+        layer="X_masked_imputed_mean",
+        groupby="leiden_pacmap",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
+
+    # Using k-nearest neighbors (N=5) imputed data
+    _ = val.viz.heatmap(
+        adata,
+        layer="X_masked_imputed_knn5",
+        groupby="leiden_pacmap",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
+    return
+
+
+@app.cell
+def _(adata, strict_mod_in_mask, val):
+    # Using original data
+    _ = val.viz.heatmap(
+        adata,
+        discrete=True,
+        layer="raw_sparse",
+        groupby="leiden_localmap",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
+
+    # Using mean imputed data
+    _ = val.viz.heatmap(
+        adata,
+        layer="X_masked_imputed_mean",
+        groupby="leiden_localmap",
+        mask_obs="cluster_mask",
+        mask_var=strict_mod_in_mask,
+    )
+
+    # Using k-nearest neighbors (N=5) imputed data
+    _ = val.viz.heatmap(
+        adata,
+        layer="X_masked_imputed_knn5",
+        groupby="leiden_localmap",
         mask_obs="cluster_mask",
         mask_var=strict_mod_in_mask,
     )
