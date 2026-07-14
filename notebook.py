@@ -104,10 +104,12 @@ def _(adata, val):
 def _(adata, np, pd, sc, val):
     # Leiden clustering on the PaCMAP embedding, restricted to cluster_mask
     # (mirrors the kmeans_pacmap masking) since leiden itself has no mask_obs arg.
+    # resolution lowered from the default 1.0 to keep cluster count in a
+    # similar range to the kmeans k_bounds=(2, 7).
     _mask = adata.obs["cluster_mask"].to_numpy()
     _sub = adata[_mask].copy()
     sc.pp.neighbors(_sub, use_rep="X_pacmap_polis")
-    val.tools.leiden(_sub, key_added="leiden_pacmap")
+    val.tools.leiden(_sub, resolution=0.05, key_added="leiden_pacmap")
 
     _labels = np.full(adata.n_obs, np.nan, dtype=object)
     _labels[_mask] = _sub.obs["leiden_pacmap"].to_numpy()
@@ -118,10 +120,12 @@ def _(adata, np, pd, sc, val):
 @app.cell
 def _(adata, np, pd, sc, val):
     # Leiden clustering on the LocalMAP embedding, restricted to cluster_mask.
+    # resolution lowered from the default 1.0 to keep cluster count in a
+    # similar range to the kmeans k_bounds=(2, 7).
     _mask = adata.obs["cluster_mask"].to_numpy()
     _sub = adata[_mask].copy()
     sc.pp.neighbors(_sub, use_rep="X_localmap_polis")
-    val.tools.leiden(_sub, key_added="leiden_localmap")
+    val.tools.leiden(_sub, resolution=0.05, key_added="leiden_localmap")
 
     _labels = np.full(adata.n_obs, np.nan, dtype=object)
     _labels[_mask] = _sub.obs["leiden_localmap"].to_numpy()
