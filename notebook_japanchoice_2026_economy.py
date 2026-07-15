@@ -309,6 +309,7 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
     _VOTE_LABELS = {1: "agree", -1: "disagree", 0: "pass"}
     _VOTE_COLOR_MAP = {"agree": "#2ca02c", "disagree": "#d62728", "pass": "#f1c40f", "no vote": "#d3d3d3"}
     _VOTE_OPTIONS = {}
+    projection_vote_full_text = {}
     _raw_votes = _sub.layers["raw_sparse"]
     for _i, (_comment_id, _content) in enumerate(zip(adata.var.index, adata.var["content"])):
         _vote_col = _raw_votes[:, _i]
@@ -319,6 +320,7 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
         projection_df[_key] = _vote_str
         _short_content = _content if len(_content) <= 60 else _content[:57] + "..."
         _VOTE_OPTIONS[f"#{_comment_id}: {_short_content}"] = _key
+        projection_vote_full_text[_key] = f"#{_comment_id}: {_content}"
 
     _COLOR_OPTIONS["Votes..."] = "__votes__"
 
@@ -370,6 +372,7 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
         projection_color_dropdown,
         projection_radio,
         projection_vote_dropdown,
+        projection_vote_full_text,
         projection_widget,
     )
 
@@ -380,15 +383,19 @@ def jscatter_display(
     projection_color_dropdown,
     projection_radio,
     projection_vote_dropdown,
+    projection_vote_full_text,
     projection_widget,
 ):
     _controls = [projection_radio, projection_color_dropdown]
+    _extra = []
     if projection_color_dropdown.value == "__votes__":
         _controls.append(projection_vote_dropdown)
+        _extra.append(mo.md(f"**{projection_vote_full_text[projection_vote_dropdown.value]}**"))
 
     mo.vstack(
         [
             mo.hstack(_controls, justify="start"),
+            *_extra,
             projection_widget,
         ]
     )
