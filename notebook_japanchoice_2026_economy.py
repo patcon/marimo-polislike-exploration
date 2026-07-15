@@ -100,40 +100,30 @@ def _(adata, val):
 
 @app.cell
 def _(adata, np, pd, val):
-    # Leiden clustering on the PaCMAP embedding, restricted to cluster_mask
+    # Leiden clustering on the PCA embedding, restricted to cluster_mask
     # (mirrors the kmeans_pacmap masking) since leiden itself has no mask_obs arg.
     # resolution lowered from the default 1.0 to keep cluster count in a
     # similar range to the kmeans k_bounds=(2, 7).
     _mask = adata.obs["cluster_mask"].to_numpy()
     _sub = adata[_mask].copy()
     val.preprocessing.neighbors(_sub, use_rep="X_pca_polis")
-    val.tools.leiden(_sub, key_added="leiden_pacmap")
+    val.tools.leiden(_sub, key_added="leiden")
 
     _labels = np.full(adata.n_obs, np.nan, dtype=object)
-    _labels[_mask] = _sub.obs["leiden_pacmap"].to_numpy()
-    adata.obs["leiden_pacmap"] = pd.Categorical(_labels)
-    return
-
-
-@app.cell
-def _(adata, np, pd, val):
-    # Leiden clustering on the LocalMAP embedding, restricted to cluster_mask.
-    # resolution lowered from the default 1.0 to keep cluster count in a
-    # similar range to the kmeans k_bounds=(2, 7).
-    _mask = adata.obs["cluster_mask"].to_numpy()
-    _sub = adata[_mask].copy()
-    val.preprocessing.neighbors(_sub, use_rep="X_pca_polis")
-    val.tools.leiden(_sub, key_added="leiden_localmap")
-
-    _labels = np.full(adata.n_obs, np.nan, dtype=object)
-    _labels[_mask] = _sub.obs["leiden_localmap"].to_numpy()
-    adata.obs["leiden_localmap"] = pd.Categorical(_labels)
+    _labels[_mask] = _sub.obs["leiden"].to_numpy()
+    adata.obs["leiden"] = pd.Categorical(_labels)
     return
 
 
 @app.cell
 def _(adata, val):
     val.viz.embedding(adata, basis="pca_polis", color="kmeans_polis")
+    return
+
+
+@app.cell
+def _(adata, val):
+    val.viz.embedding(adata, basis="pca_polis", color="leiden")
     return
 
 
@@ -165,13 +155,13 @@ def _(adata, val):
 
 @app.cell
 def _(adata, val):
-    val.viz.embedding(adata, basis="pacmap_polis", color="leiden_pacmap")
+    val.viz.embedding(adata, basis="pacmap_polis", color="leiden")
     return
 
 
 @app.cell
 def _(adata, val):
-    val.viz.embedding(adata, basis="localmap_polis", color="leiden_localmap")
+    val.viz.embedding(adata, basis="localmap_polis", color="leiden")
     return
 
 
@@ -203,7 +193,7 @@ def _(adata, strict_mod_in_mask, val):
         adata,
         discrete=True,
         layer="raw_sparse",
-        groupby="leiden_pacmap",
+        groupby="leiden",
         mask_obs="cluster_mask",
         mask_var=strict_mod_in_mask,
     )
@@ -217,7 +207,7 @@ def _(adata, strict_mod_in_mask, val):
         adata,
         discrete=True,
         layer="raw_sparse",
-        groupby="leiden_localmap",
+        groupby="leiden",
         mask_obs="cluster_mask",
         mask_var=strict_mod_in_mask,
     )
