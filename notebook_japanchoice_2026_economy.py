@@ -246,7 +246,7 @@ def _(adata, get_adata_rev, val):
 
 
 @app.cell
-def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd, val):
+def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
     _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
 
     _mask = adata.obs["cluster_mask"].to_numpy()
@@ -303,6 +303,25 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd, val):
             projection_df[_key] = _sub_nn.obs[_key].astype(str).to_numpy()
             _COLOR_OPTIONS[f"leiden (nn={_nn}, res={_res:.2f})"] = _key
 
+    # Per-statement vote coloring: agree/disagree/pass/no-vote for each comment,
+    # selectable via a separate "Statement" dropdown that only appears once
+    # "Votes" is chosen as the color mode.
+    _VOTE_LABELS = {1: "agree", -1: "disagree", 0: "pass"}
+    _VOTE_COLOR_MAP = {"agree": "#2ca02c", "disagree": "#d62728", "pass": "#f1c40f", "no vote": "#d3d3d3"}
+    _VOTE_OPTIONS = {}
+    _raw_votes = _sub.layers["raw_sparse"]
+    for _i, (_comment_id, _content) in enumerate(zip(adata.var.index, adata.var["content"])):
+        _vote_col = _raw_votes[:, _i]
+        _vote_str = np.full(_vote_col.shape, "no vote", dtype=object)
+        for _v, _label in _VOTE_LABELS.items():
+            _vote_str[_vote_col == _v] = _label
+        _key = f"vote_{_comment_id}"
+        projection_df[_key] = _vote_str
+        _short_content = _content if len(_content) <= 60 else _content[:57] + "..."
+        _VOTE_OPTIONS[f"#{_comment_id}: {_short_content}"] = _key
+
+    _COLOR_OPTIONS["Votes..."] = "__votes__"
+
     projection_scatter = jscatter.Scatter(
         data=projection_df, x="pca_x", y="pca_y", color_by="leiden"
     )
@@ -316,7 +335,14 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd, val):
 
 
     def _on_color_change(column):
-        projection_scatter.color(by=column)
+        if column == "__votes__":
+            projection_scatter.color(by=projection_vote_dropdown.value, map=_VOTE_COLOR_MAP)
+        else:
+            projection_scatter.color(by=column, map="auto")
+
+
+    def _on_vote_change(column):
+        projection_scatter.color(by=column, map=_VOTE_COLOR_MAP)
 
 
     projection_radio = mo.ui.radio(
@@ -333,7 +359,19 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd, val):
         on_change=_on_color_change,
     )
 
-    return projection_color_dropdown, projection_radio, projection_widget
+    projection_vote_dropdown = mo.ui.dropdown(
+        options=_VOTE_OPTIONS,
+        value=list(_VOTE_OPTIONS.keys())[0],
+        label="Statement",
+        on_change=_on_vote_change,
+    )
+
+    return (
+        projection_color_dropdown,
+        projection_radio,
+        projection_vote_dropdown,
+        projection_widget,
+    )
 
 
 @app.cell
@@ -341,11 +379,16 @@ def jscatter_display(
     mo,
     projection_color_dropdown,
     projection_radio,
+    projection_vote_dropdown,
     projection_widget,
 ):
+    _controls = [projection_radio, projection_color_dropdown]
+    if projection_color_dropdown.value == "__votes__":
+        _controls.append(projection_vote_dropdown)
+
     mo.vstack(
         [
-            mo.hstack([projection_radio, projection_color_dropdown], justify="start"),
+            mo.hstack(_controls, justify="start"),
             projection_widget,
         ]
     )
