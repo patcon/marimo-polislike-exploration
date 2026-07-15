@@ -10,9 +10,10 @@ def _():
     import valency_anndata as val
     import numpy as np
     import pandas as pd
+    import jscatter
 
 
-    return mo, np, pd, val
+    return jscatter, mo, np, pd, val
 
 
 @app.cell
@@ -48,7 +49,6 @@ def _(adata, set_adata_rev):
     elif adata.var["is_meta"].isna().any():
         adata.var["is_meta"] = adata.var["is_meta"].fillna(False).astype(bool)
     set_adata_rev(lambda v: v + 1)
-
     return
 
 
@@ -56,7 +56,6 @@ def _(adata, set_adata_rev):
 def _(adata, set_adata_rev, val):
     val.tools.recipe_polis(adata)
     set_adata_rev(lambda v: v + 1)
-
     return
 
 
@@ -65,7 +64,6 @@ def _(adata, set_adata_rev, val):
     val.preprocessing.impute(adata, strategy="knn", source_layer="X_masked", target_layer="X_masked_imputed_knn5")
     set_adata_rev(lambda v: v + 1)
     val.viz.schematic_diagram(adata)
-
     return
 
 
@@ -88,7 +86,6 @@ def _(adata, set_adata_rev, val):
         key_added="kmeans_pacmap",
     )
     set_adata_rev(lambda v: v + 1)
-
     return
 
 
@@ -111,7 +108,6 @@ def _(adata, set_adata_rev, val):
         key_added="kmeans_localmap",
     )
     set_adata_rev(lambda v: v + 1)
-
     return
 
 
@@ -131,7 +127,6 @@ def _(adata, np, pd, set_adata_rev, val):
     _labels[_mask] = _sub.obs["leiden"].to_numpy()
     adata.obs["leiden"] = pd.Categorical(_labels)
     set_adata_rev(lambda v: v + 1)
-
     return
 
 
@@ -183,7 +178,6 @@ def leiden_sweep_compute(
         f"at n_neighbors={leiden_n_neighbors_slider.value}, "
         f"resolution={leiden_resolution_slider.value:.2f}"
     )
-
     return
 
 
@@ -205,7 +199,6 @@ def _(adata, get_adata_rev, val):
 def _(adata, get_adata_rev, val):
     _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="pca_polis", color="leiden")
-
     return
 
 
@@ -221,7 +214,6 @@ def _(adata, get_adata_rev, strict_mod_in_mask, val):
         mask_obs="cluster_mask",
         mask_var=strict_mod_in_mask,
     )
-
     return
 
 
@@ -250,6 +242,57 @@ def _(adata, get_adata_rev, val):
 def _(adata, get_adata_rev, val):
     _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="localmap_polis", color="leiden")
+    return
+
+
+@app.cell
+def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
+
+    _mask = adata.obs["cluster_mask"].to_numpy()
+    _sub = adata[_mask]
+
+    projection_df = pd.DataFrame({
+        "pca_x": _sub.obsm["X_pca_polis"][:, 0],
+        "pca_y": _sub.obsm["X_pca_polis"][:, 1],
+        "pacmap_x": _sub.obsm["X_pacmap_polis"][:, 0],
+        "pacmap_y": _sub.obsm["X_pacmap_polis"][:, 1],
+        "localmap_x": _sub.obsm["X_localmap_polis"][:, 0],
+        "localmap_y": _sub.obsm["X_localmap_polis"][:, 1],
+        "leiden": _sub.obs["leiden"].astype(str).to_numpy(),
+    })
+
+    _PROJECTIONS = {
+        "PCA": ("pca_x", "pca_y"),
+        "PaCMAP": ("pacmap_x", "pacmap_y"),
+        "LocalMAP": ("localmap_x", "localmap_y"),
+    }
+
+    projection_scatter = jscatter.Scatter(
+        data=projection_df, x="pca_x", y="pca_y", color_by="leiden"
+    )
+    projection_scatter.options(transition_points_duration=1500)
+    projection_widget = mo.ui.anywidget(projection_scatter.widget)
+
+
+    def _on_projection_change(name):
+        x_col, y_col = _PROJECTIONS[name]
+        projection_scatter.xy(x=x_col, y=y_col, animate=True)
+
+
+    projection_radio = mo.ui.radio(
+        options=list(_PROJECTIONS.keys()),
+        value="PCA",
+        label="Projection",
+        on_change=_on_projection_change,
+    )
+
+    return projection_radio, projection_widget
+
+
+@app.cell
+def jscatter_display(mo, projection_radio, projection_widget):
+    mo.vstack([projection_radio, projection_widget])
     return
 
 
