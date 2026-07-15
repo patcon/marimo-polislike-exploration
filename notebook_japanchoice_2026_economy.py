@@ -325,7 +325,7 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
     _COLOR_OPTIONS["Votes..."] = "__votes__"
 
     projection_scatter = jscatter.Scatter(
-        data=projection_df, x="pca_x", y="pca_y", color_by="leiden"
+        data=projection_df, x="pca_x", y="pca_y", color_by="leiden", height=480
     )
     projection_scatter.options(transition_points_duration=1500)
     projection_widget = mo.ui.anywidget(projection_scatter.widget)
