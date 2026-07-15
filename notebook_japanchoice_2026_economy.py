@@ -6,11 +6,13 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    import marimo as mo
     import valency_anndata as val
     import numpy as np
     import pandas as pd
 
-    return np, pd, val
+
+    return mo, np, pd, val
 
 
 @app.cell
@@ -102,8 +104,9 @@ def _(adata, val):
 def _(adata, np, pd, val):
     # Leiden clustering on the PCA embedding, restricted to cluster_mask
     # (mirrors the kmeans_pacmap masking) since leiden itself has no mask_obs arg.
-    # resolution lowered from the default 1.0 to keep cluster count in a
-    # similar range to the kmeans k_bounds=(2, 7).
+    # Uses the resolution=1 default; see the leiden_n_neighbors_slider/
+    # leiden_resolution_slider sweep below for how cluster count varies with
+    # these params, e.g. to match kmeans's k_bounds=(2, 7) range.
     _mask = adata.obs["cluster_mask"].to_numpy()
     _sub = adata[_mask].copy()
     val.preprocessing.neighbors(_sub, use_rep="X_pca_polis")
@@ -112,6 +115,64 @@ def _(adata, np, pd, val):
     _labels = np.full(adata.n_obs, np.nan, dtype=object)
     _labels[_mask] = _sub.obs["leiden"].to_numpy()
     adata.obs["leiden"] = pd.Categorical(_labels)
+
+    return
+
+
+@app.cell
+def leiden_sweep_sliders(mo):
+    leiden_n_neighbors_slider = mo.ui.slider(5, 50, step=5, value=15, label="n_neighbors")
+    leiden_resolution_slider = mo.ui.slider(0.1, 2.0, step=0.05, value=1.0, label="resolution")
+    mo.hstack([leiden_n_neighbors_slider, leiden_resolution_slider])
+
+    return leiden_n_neighbors_slider, leiden_resolution_slider
+
+
+@app.cell(hide_code=True)
+def leiden_sweep_compute(
+    adata,
+    leiden_n_neighbors_slider,
+    leiden_resolution_slider,
+    mo,
+    np,
+    pd,
+    val,
+):
+    # Interactive leiden sweep: re-run neighbors + leiden on the PCA embedding
+    # with the slider params, to see how cluster count/sizes vary.
+    _mask = adata.obs["cluster_mask"].to_numpy()
+    _sub = adata[_mask].copy()
+    val.preprocessing.neighbors(
+        _sub, n_neighbors=leiden_n_neighbors_slider.value, use_rep="X_pca_polis"
+    )
+    val.tools.leiden(
+        _sub,
+        resolution=leiden_resolution_slider.value,
+        key_added="leiden_sweep",
+        flavor="igraph",
+        n_iterations=2,
+        directed=False,
+    )
+
+    _labels = np.full(adata.n_obs, np.nan, dtype=object)
+    _labels[_mask] = _sub.obs["leiden_sweep"].to_numpy()
+    adata.obs["leiden_sweep"] = pd.Categorical(_labels)
+
+    leiden_sweep_n_clusters = _sub.obs["leiden_sweep"].nunique()
+    leiden_sweep_sizes = _sub.obs["leiden_sweep"].value_counts()
+    mo.md(
+        f"**{leiden_sweep_n_clusters} clusters** "
+        f"(sizes {leiden_sweep_sizes.min()}-{leiden_sweep_sizes.max()}) "
+        f"at n_neighbors={leiden_n_neighbors_slider.value}, "
+        f"resolution={leiden_resolution_slider.value:.2f}"
+    )
+
+    return
+
+
+@app.cell
+def leiden_sweep_viz(adata, val):
+    val.viz.embedding(adata, basis="pca_polis", color="leiden_sweep")
     return
 
 
