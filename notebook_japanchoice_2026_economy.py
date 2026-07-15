@@ -16,50 +16,61 @@ def _():
 
 
 @app.cell
+def adata_rev_state(mo):
+    get_adata_rev, set_adata_rev = mo.state(0)
+    return get_adata_rev, set_adata_rev
+
+
+@app.cell
 def _(val):
     adata = val.datasets.japanchoice(topic="2026_economy_taxation_employment", translate_to="en")
-
-    # work-around for valency-anndata/scanpy doing in-memory edits that aren't reative.
-    _ = True
     return (adata,)
 
 
 @app.cell
-def _(adata, val):
-    _ = val.viz.schematic_diagram(adata)
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
+    val.viz.schematic_diagram(adata)
     return
 
 
 @app.cell
-def _(adata):
+def _(adata, get_adata_rev):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     adata.var
     return
 
 
 @app.cell
-def _(adata):
+def _(adata, set_adata_rev):
     if "is_meta" not in adata.var.columns:
         adata.var["is_meta"] = False
     elif adata.var["is_meta"].isna().any():
         adata.var["is_meta"] = adata.var["is_meta"].fillna(False).astype(bool)
+    set_adata_rev(lambda v: v + 1)
+
     return
 
 
 @app.cell
-def _(adata, val):
-    _ = val.tools.recipe_polis(adata)
+def _(adata, set_adata_rev, val):
+    val.tools.recipe_polis(adata)
+    set_adata_rev(lambda v: v + 1)
+
     return
 
 
 @app.cell
-def _(adata, val):
-    _ = val.preprocessing.impute(adata, strategy="knn", source_layer="X_masked", target_layer="X_masked_imputed_knn5")
-    _ = val.viz.schematic_diagram(adata)
+def _(adata, set_adata_rev, val):
+    val.preprocessing.impute(adata, strategy="knn", source_layer="X_masked", target_layer="X_masked_imputed_knn5")
+    set_adata_rev(lambda v: v + 1)
+    val.viz.schematic_diagram(adata)
+
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, set_adata_rev, val):
     # PaCMAP-based recipe, modelled after val.tools.recipe_polis:
     # same masked/imputed layer and participant vote-count mask, but
     # embedding via PaCMAP instead of PCA + sparsity-aware scaling.
@@ -76,11 +87,13 @@ def _(adata, val):
         mask_obs="cluster_mask",
         key_added="kmeans_pacmap",
     )
+    set_adata_rev(lambda v: v + 1)
+
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, set_adata_rev, val):
     # LocalMAP-based recipe, modelled after val.tools.recipe_polis:
     # same participant vote-count mask, but embedding via LocalMAP on the
     # KNN-imputed layer instead of PCA + sparsity-aware scaling.
@@ -97,11 +110,13 @@ def _(adata, val):
         mask_obs="cluster_mask",
         key_added="kmeans_localmap",
     )
+    set_adata_rev(lambda v: v + 1)
+
     return
 
 
 @app.cell
-def _(adata, np, pd, val):
+def _(adata, np, pd, set_adata_rev, val):
     # Leiden clustering on the PCA embedding, restricted to cluster_mask
     # (mirrors the kmeans_pacmap masking) since leiden itself has no mask_obs arg.
     # Uses the resolution=1 default; see the leiden_n_neighbors_slider/
@@ -110,11 +125,12 @@ def _(adata, np, pd, val):
     _mask = adata.obs["cluster_mask"].to_numpy()
     _sub = adata[_mask].copy()
     val.preprocessing.neighbors(_sub, use_rep="X_pca_polis")
-    val.tools.leiden(_sub, key_added="leiden")
+    val.tools.leiden(_sub, key_added="leiden", flavor="igraph", n_iterations=2, directed=False)
 
     _labels = np.full(adata.n_obs, np.nan, dtype=object)
     _labels[_mask] = _sub.obs["leiden"].to_numpy()
     adata.obs["leiden"] = pd.Categorical(_labels)
+    set_adata_rev(lambda v: v + 1)
 
     return
 
@@ -124,7 +140,6 @@ def leiden_sweep_sliders(mo):
     leiden_n_neighbors_slider = mo.ui.slider(5, 50, step=5, value=15, label="n_neighbors")
     leiden_resolution_slider = mo.ui.slider(0.1, 2.0, step=0.05, value=1.0, label="resolution")
     mo.hstack([leiden_n_neighbors_slider, leiden_resolution_slider])
-
     return leiden_n_neighbors_slider, leiden_resolution_slider
 
 
@@ -136,6 +151,7 @@ def leiden_sweep_compute(
     mo,
     np,
     pd,
+    set_adata_rev,
     val,
 ):
     # Interactive leiden sweep: re-run neighbors + leiden on the PCA embedding
@@ -157,6 +173,7 @@ def leiden_sweep_compute(
     _labels = np.full(adata.n_obs, np.nan, dtype=object)
     _labels[_mask] = _sub.obs["leiden_sweep"].to_numpy()
     adata.obs["leiden_sweep"] = pd.Categorical(_labels)
+    set_adata_rev(lambda v: v + 1)
 
     leiden_sweep_n_clusters = _sub.obs["leiden_sweep"].nunique()
     leiden_sweep_sizes = _sub.obs["leiden_sweep"].value_counts()
@@ -171,27 +188,32 @@ def leiden_sweep_compute(
 
 
 @app.cell
-def leiden_sweep_viz(adata, val):
+def leiden_sweep_viz(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="pca_polis", color="leiden_sweep")
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="pca_polis", color="kmeans_polis")
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="pca_polis", color="leiden")
+
     return
 
 
 @app.cell
-def _(adata, strict_mod_in_mask, val):
+def _(adata, get_adata_rev, strict_mod_in_mask, val):
     # Using original data
-    _ = val.viz.heatmap(
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
+    val.viz.heatmap(
         adata,
         discrete=True,
         layer="raw_sparse",
@@ -199,44 +221,51 @@ def _(adata, strict_mod_in_mask, val):
         mask_obs="cluster_mask",
         mask_var=strict_mod_in_mask,
     )
+
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="pacmap_polis", color="kmeans_pacmap")
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="localmap_polis", color="kmeans_localmap")
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="pacmap_polis", color="leiden")
     return
 
 
 @app.cell
-def _(adata, val):
+def _(adata, get_adata_rev, val):
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     val.viz.embedding(adata, basis="localmap_polis", color="leiden")
     return
 
 
 @app.cell
-def _(adata):
+def _(adata, get_adata_rev):
     # This conversation used strict moderation, so unless explicitly voted in, it wasn't shown.
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
     strict_mod_in_mask = (adata.var["moderation_state"] > 0).to_numpy()
     return (strict_mod_in_mask,)
 
 
 @app.cell
-def _(adata, strict_mod_in_mask, val):
+def _(adata, get_adata_rev, strict_mod_in_mask, val):
     # Using original data
-    _ = val.viz.heatmap(
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
+    val.viz.heatmap(
         adata,
         discrete=True,
         layer="raw_sparse",
@@ -248,9 +277,10 @@ def _(adata, strict_mod_in_mask, val):
 
 
 @app.cell
-def _(adata, strict_mod_in_mask, val):
+def _(adata, get_adata_rev, strict_mod_in_mask, val):
     # Using original data
-    _ = val.viz.heatmap(
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
+    val.viz.heatmap(
         adata,
         discrete=True,
         layer="raw_sparse",
@@ -262,9 +292,10 @@ def _(adata, strict_mod_in_mask, val):
 
 
 @app.cell
-def _(adata, strict_mod_in_mask, val):
+def _(adata, get_adata_rev, strict_mod_in_mask, val):
     # Using original data
-    _ = val.viz.heatmap(
+    _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
+    val.viz.heatmap(
         adata,
         discrete=True,
         layer="raw_sparse",
