@@ -246,7 +246,7 @@ def _(adata, get_adata_rev, val):
 
 
 @app.cell
-def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd):
+def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd, val):
     _ = get_adata_rev()  # force rerun whenever adata is mutated elsewhere
 
     _mask = adata.obs["cluster_mask"].to_numpy()
@@ -260,6 +260,10 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd):
         "localmap_x": _sub.obsm["X_localmap_polis"][:, 0],
         "localmap_y": _sub.obsm["X_localmap_polis"][:, 1],
         "leiden": _sub.obs["leiden"].astype(str).to_numpy(),
+        "leiden_sweep": _sub.obs["leiden_sweep"].astype(str).to_numpy(),
+        "kmeans_polis": _sub.obs["kmeans_polis"].astype(str).to_numpy(),
+        "kmeans_pacmap": _sub.obs["kmeans_pacmap"].astype(str).to_numpy(),
+        "kmeans_localmap": _sub.obs["kmeans_localmap"].astype(str).to_numpy(),
     })
 
     _PROJECTIONS = {
@@ -267,6 +271,37 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd):
         "PaCMAP": ("pacmap_x", "pacmap_y"),
         "LocalMAP": ("localmap_x", "localmap_y"),
     }
+
+    _COLOR_OPTIONS = {
+        "leiden (canonical)": "leiden",
+        "leiden_sweep (slider)": "leiden_sweep",
+        "kmeans (PCA)": "kmeans_polis",
+        "kmeans (PaCMAP)": "kmeans_pacmap",
+        "kmeans (LocalMAP)": "kmeans_localmap",
+    }
+
+    # Precompute a grid of leiden clusterings at different n_neighbors/resolution
+    # combos, so switching colors via the dropdown is instant instead of
+    # recomputing on the fly. Neighbors are computed once per n_neighbors value
+    # and reused across resolutions, since only resolution affects the (cheap)
+    # partitioning step.
+    _GRID_N_NEIGHBORS = [10, 15, 30]
+    _GRID_RESOLUTIONS = [0.25, 0.5, 1.0]
+    for _nn in _GRID_N_NEIGHBORS:
+        _sub_nn = _sub.copy()
+        val.preprocessing.neighbors(_sub_nn, n_neighbors=_nn, use_rep="X_pca_polis")
+        for _res in _GRID_RESOLUTIONS:
+            _key = f"leiden_nn{_nn}_res{_res:.2f}"
+            val.tools.leiden(
+                _sub_nn,
+                resolution=_res,
+                key_added=_key,
+                flavor="igraph",
+                n_iterations=2,
+                directed=False,
+            )
+            projection_df[_key] = _sub_nn.obs[_key].astype(str).to_numpy()
+            _COLOR_OPTIONS[f"leiden (nn={_nn}, res={_res:.2f})"] = _key
 
     projection_scatter = jscatter.Scatter(
         data=projection_df, x="pca_x", y="pca_y", color_by="leiden"
@@ -280,6 +315,10 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd):
         projection_scatter.xy(x=x_col, y=y_col, animate=True)
 
 
+    def _on_color_change(column):
+        projection_scatter.color(by=column)
+
+
     projection_radio = mo.ui.radio(
         options=list(_PROJECTIONS.keys()),
         value="PCA",
@@ -287,12 +326,30 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, pd):
         on_change=_on_projection_change,
     )
 
-    return projection_radio, projection_widget
+    projection_color_dropdown = mo.ui.dropdown(
+        options=_COLOR_OPTIONS,
+        value="leiden (canonical)",
+        label="Color by",
+        on_change=_on_color_change,
+    )
+
+    return projection_color_dropdown, projection_radio, projection_widget
 
 
 @app.cell
-def jscatter_display(mo, projection_radio, projection_widget):
-    mo.vstack([projection_radio, projection_widget])
+def jscatter_display(
+    mo,
+    projection_color_dropdown,
+    projection_radio,
+    projection_widget,
+):
+    mo.vstack(
+        [
+            mo.hstack([projection_radio, projection_color_dropdown], justify="start"),
+            projection_widget,
+        ]
+    )
+
     return
 
 
