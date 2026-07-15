@@ -347,7 +347,7 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
         projection_scatter.color(by=column, map=_VOTE_COLOR_MAP)
 
 
-    projection_radio = mo.ui.radio(
+    projection_dropdown = mo.ui.dropdown(
         options=list(_PROJECTIONS.keys()),
         value="PCA",
         label="Projection",
@@ -370,7 +370,7 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
 
     return (
         projection_color_dropdown,
-        projection_radio,
+        projection_dropdown,
         projection_vote_dropdown,
         projection_vote_full_text,
         projection_widget,
@@ -381,12 +381,12 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
 def jscatter_display(
     mo,
     projection_color_dropdown,
-    projection_radio,
+    projection_dropdown,
     projection_vote_dropdown,
     projection_vote_full_text,
     projection_widget,
 ):
-    _controls = [projection_radio, projection_color_dropdown]
+    _controls = [projection_dropdown, projection_color_dropdown]
     _extra = []
     if projection_color_dropdown.value == "__votes__":
         _controls.append(projection_vote_dropdown)
