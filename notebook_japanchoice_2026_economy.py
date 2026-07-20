@@ -266,13 +266,13 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
         "kmeans_localmap": _sub.obs["kmeans_localmap"].astype(str).to_numpy(),
     })
 
-    _PROJECTIONS = {
+    PROJECTIONS = {
         "PCA": ("pca_x", "pca_y"),
         "PaCMAP": ("pacmap_x", "pacmap_y"),
         "LocalMAP": ("localmap_x", "localmap_y"),
     }
 
-    _COLOR_OPTIONS = {
+    CLUSTER_COLOR_OPTIONS = {
         "leiden (canonical)": "leiden",
         "leiden_sweep (slider)": "leiden_sweep",
         "kmeans (PCA)": "kmeans_polis",
@@ -301,14 +301,14 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
                 directed=False,
             )
             projection_df[_key] = _sub_nn.obs[_key].astype(str).to_numpy()
-            _COLOR_OPTIONS[f"leiden (nn={_nn}, res={_res:.2f})"] = _key
+            CLUSTER_COLOR_OPTIONS[f"leiden (nn={_nn}, res={_res:.2f})"] = _key
 
     # Per-statement vote coloring: agree/disagree/pass/no-vote for each comment,
     # selectable via a separate "Statement" dropdown that only appears once
     # "Votes" is chosen as the color mode.
     _VOTE_LABELS = {1: "agree", -1: "disagree", 0: "pass"}
-    _VOTE_COLOR_MAP = {"agree": "#2ca02c", "disagree": "#d62728", "pass": "#f1c40f", "no vote": "#d3d3d3"}
-    _VOTE_OPTIONS = {}
+    VOTE_COLOR_MAP = {"agree": "#2ca02c", "disagree": "#d62728", "pass": "#f1c40f", "no vote": "#d3d3d3"}
+    VOTE_OPTIONS = {}
     projection_vote_full_text = {}
     _raw_votes = _sub.layers["raw_sparse"]
     for _i, (_comment_id, _content) in enumerate(zip(adata.var.index, adata.var["content"])):
@@ -319,10 +319,8 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
         _key = f"vote_{_comment_id}"
         projection_df[_key] = _vote_str
         _short_content = _content if len(_content) <= 60 else _content[:57] + "..."
-        _VOTE_OPTIONS[f"#{_comment_id}: {_short_content}"] = _key
+        VOTE_OPTIONS[f"#{_comment_id}: {_short_content}"] = _key
         projection_vote_full_text[_key] = f"#{_comment_id}: {_content}"
-
-    _COLOR_OPTIONS["Votes..."] = "__votes__"
 
     projection_scatter = jscatter.Scatter(
         data=projection_df, x="pca_x", y="pca_y", color_by="leiden", height=480
@@ -332,44 +330,48 @@ def jscatter_setup(adata, get_adata_rev, jscatter, mo, np, pd, val):
 
 
     def _on_projection_change(name):
-        x_col, y_col = _PROJECTIONS[name]
+        x_col, y_col = PROJECTIONS[name]
         projection_scatter.xy(x=x_col, y=y_col, animate=True)
 
 
     def _on_color_change(column):
         if column == "__votes__":
-            projection_scatter.color(by=projection_vote_dropdown.value, map=_VOTE_COLOR_MAP)
+            projection_scatter.color(by=projection_vote_dropdown.value, map=VOTE_COLOR_MAP)
         else:
             projection_scatter.color(by=column, map="auto")
 
 
     def _on_vote_change(column):
-        projection_scatter.color(by=column, map=_VOTE_COLOR_MAP)
+        projection_scatter.color(by=column, map=VOTE_COLOR_MAP)
 
 
     projection_dropdown = mo.ui.dropdown(
-        options=list(_PROJECTIONS.keys()),
+        options=list(PROJECTIONS.keys()),
         value="PCA",
         label="Projection",
         on_change=_on_projection_change,
     )
 
     projection_color_dropdown = mo.ui.dropdown(
-        options=_COLOR_OPTIONS,
+        options={**CLUSTER_COLOR_OPTIONS, "Votes...": "__votes__"},
         value="leiden (canonical)",
         label="Color by",
         on_change=_on_color_change,
     )
 
     projection_vote_dropdown = mo.ui.dropdown(
-        options=_VOTE_OPTIONS,
-        value=list(_VOTE_OPTIONS.keys())[0],
+        options=VOTE_OPTIONS,
+        value=list(VOTE_OPTIONS.keys())[0],
         label="Statement",
         on_change=_on_vote_change,
     )
-
     return (
+        CLUSTER_COLOR_OPTIONS,
+        PROJECTIONS,
+        VOTE_COLOR_MAP,
+        VOTE_OPTIONS,
         projection_color_dropdown,
+        projection_df,
         projection_dropdown,
         projection_vote_dropdown,
         projection_vote_full_text,
@@ -452,6 +454,113 @@ def _(adata, get_adata_rev, strict_mod_in_mask, val):
         groupby="leiden",
         mask_obs="cluster_mask",
         mask_var=strict_mod_in_mask,
+    )
+    return
+
+
+@app.cell
+def _(
+    CLUSTER_COLOR_OPTIONS,
+    PROJECTIONS,
+    VOTE_COLOR_MAP,
+    VOTE_OPTIONS,
+    jscatter,
+    mo,
+    projection_df,
+):
+    compare_left_scatter = jscatter.Scatter(
+        data=projection_df, x="pca_x", y="pca_y", color_by="leiden", height=420
+    )
+    compare_left_scatter.options(transition_points_duration=1500)
+
+    compare_right_scatter = jscatter.Scatter(
+        data=projection_df,
+        x="pca_x",
+        y="pca_y",
+        color_by=list(VOTE_OPTIONS.values())[0],
+        color_map=VOTE_COLOR_MAP,
+        height=420,
+    )
+    compare_right_scatter.options(transition_points_duration=1500)
+
+    # jscatter.compose()'s marimo layout just str()-ifies the widgets, which
+    # renders as static, non-interactive text. Call it only for its side effect
+    # of wiring up view/selection/hover syncing between the two scatter
+    # instances, and build the actual display ourselves below with
+    # mo.ui.anywidget so marimo renders them interactively.
+    _ = jscatter.compose(
+        [compare_left_scatter, compare_right_scatter],
+        sync_view=True,
+        sync_selection=True,
+        sync_hover=True,
+        cols=2,
+    )
+
+    compare_left_widget = mo.ui.anywidget(compare_left_scatter.widget)
+    compare_right_widget = mo.ui.anywidget(compare_right_scatter.widget)
+
+
+    def _on_compare_projection_change(name):
+        x_col, y_col = PROJECTIONS[name]
+        compare_left_scatter.xy(x=x_col, y=y_col, animate=True)
+        compare_right_scatter.xy(x=x_col, y=y_col, animate=True)
+
+
+    def _on_compare_group_change(column):
+        compare_left_scatter.color(by=column, map="auto")
+
+
+    def _on_compare_statement_change(column):
+        compare_right_scatter.color(by=column, map=VOTE_COLOR_MAP)
+
+
+    compare_projection_dropdown = mo.ui.dropdown(
+        options=list(PROJECTIONS.keys()),
+        value="PCA",
+        label="Projection",
+        on_change=_on_compare_projection_change,
+    )
+
+    compare_group_dropdown = mo.ui.dropdown(
+        options=CLUSTER_COLOR_OPTIONS,
+        value="leiden (canonical)",
+        label="Left: group by",
+        on_change=_on_compare_group_change,
+    )
+
+    compare_statement_dropdown = mo.ui.dropdown(
+        options=VOTE_OPTIONS,
+        value=list(VOTE_OPTIONS.keys())[0],
+        label="Right: statement",
+        on_change=_on_compare_statement_change,
+    )
+    return (
+        compare_group_dropdown,
+        compare_left_widget,
+        compare_projection_dropdown,
+        compare_right_widget,
+        compare_statement_dropdown,
+    )
+
+
+@app.cell
+def _(
+    compare_group_dropdown,
+    compare_left_widget,
+    compare_projection_dropdown,
+    compare_right_widget,
+    compare_statement_dropdown,
+    mo,
+    projection_vote_full_text,
+):
+    _controls = [compare_projection_dropdown, compare_group_dropdown, compare_statement_dropdown]
+
+    mo.vstack(
+        [
+            mo.hstack(_controls, justify="start"),
+            mo.md(f"**{projection_vote_full_text[compare_statement_dropdown.value]}**"),
+            mo.hstack([compare_left_widget, compare_right_widget], widths="equal", gap=1),
+        ]
     )
     return
 
