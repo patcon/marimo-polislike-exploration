@@ -1,0 +1,82 @@
+name: Build and deploy notebooks to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Point valency-anndata at the heatmap-mask-obs branch
+        run: make install-remote-patch BRANCH=heatmap-mask-obs
+
+      - name: Export notebooks to HTML
+        run: |
+          mkdir -p site
+          for nb in notebook*.py; do
+            name="${nb%.py}"
+            uv run marimo export html "$nb" -o "site/${name}.html"
+          done
+
+      - name: Generate index page
+        run: |
+          python <<'PY'
+          import pathlib
+
+          site = pathlib.Path("site")
+          pages = sorted(p.name for p in site.glob("*.html"))
+
+          links = "\n".join(
+              f'    <li><a href="{page}">{page[:-5]}</a></li>' for page in pages
+          )
+          html = f"""<!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>marimo-polislike-exploration notebooks</title>
+          </head>
+          <body>
+            <h1>Notebooks</h1>
+            <ul>
+          {links}
+            </ul>
+          </body>
+          </html>
+          """
+          (site / "index.html").write_text(html)
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
