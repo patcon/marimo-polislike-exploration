@@ -401,7 +401,6 @@ def jscatter_display(
             projection_widget,
         ]
     )
-
     return
 
 
@@ -459,7 +458,7 @@ def _(adata, get_adata_rev, strict_mod_in_mask, val):
 
 
 @app.cell
-def _(
+def jscatter_compare_setup(
     CLUSTER_COLOR_OPTIONS,
     PROJECTIONS,
     VOTE_COLOR_MAP,
@@ -544,7 +543,7 @@ def _(
 
 
 @app.cell
-def _(
+def jscatter_compare_display(
     compare_group_dropdown,
     compare_left_widget,
     compare_projection_dropdown,
